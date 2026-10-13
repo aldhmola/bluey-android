@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_summary">Lets Bluey float over your apps, see the screen and point at things.</string>
+    <string name="accessibility_description">Bluey is a little blueberry who floats over your apps. With this on, he can read what is on your screen and take a screenshot when you ask him something, point at things with his own cursor, and, only if you switch on \"Let him use the phone\" in the Bluey app and ask him to, tap, type, scroll and open apps for you. He refuses password fields, confirms before anything hard to undo, and a single tap on him stops him. Nothing is read unless you are talking to him.</string>
+</resources>
