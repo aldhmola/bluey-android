@@ -25,7 +25,7 @@ New builds appear in Releases automatically after every push. Installing a new o
 
 ## How it works
 
-- `LiveVoice.kt` runs an OpenAI Realtime session (`gpt-realtime-2.1`, text out only) over a WebSocket. Server VAD
+- `LiveVoice.kt` runs an OpenAI Realtime session (`gpt-realtime-2.1`, or `gpt-realtime-2.1-mini` with "Cheaper brain" on; text out only) over a WebSocket. Server VAD
   transcribes every turn with `create_response: false`; letting go of Bluey commits the audio and asks for a reply.
 - `Brain.kt` holds his instructions and tools: `look_at_screen`, `point_at`, `point_at_spot`, `web_research`,
   `stop_pointing`, `go_to_sleep`, and (with "Let him use the phone" on) `tap`, `type_text`, `press_button`,

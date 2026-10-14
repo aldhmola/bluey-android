@@ -259,6 +259,9 @@ class MainActivity : Activity() {
         settingsBox.addView(toggle("Let him use the phone", "Tap, type, scroll and open apps when you ask. He confirms before anything hard to undo.", s.phoneControl) {
             s.phoneControl = it
         })
+        settingsBox.addView(toggle("Cheaper brain (mini)", "About a third of the price. Fine for questions and notes; a bit weaker at multi-step phone tasks.", s.cheapBrain) {
+            s.cheapBrain = it
+        })
         settingsBox.addView(toggle("Record meeting notes", "Saves the session's audio in five-minute chunks and transcribes it with speaker labels.", s.meetingNotes) {
             s.meetingNotes = it
         })
@@ -271,7 +274,7 @@ class MainActivity : Activity() {
             BlueyAccessibility.instance?.overlay?.screenChanged()
         })
         settingsBox.addView(button("Personality…") { editPersonality() }, matchWrap(bottom = 4))
-        settingsBox.addView(note("Changes to personality and phone control apply the next time you wake him."))
+        settingsBox.addView(note("Changes to the brain, personality and phone control apply the next time you wake him."))
     }
 
     private fun renderNotes() {

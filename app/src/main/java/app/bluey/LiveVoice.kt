@@ -35,6 +35,8 @@ class LiveVoice {
 
     @Volatile private var socket: WebSocket? = null
     private var wantAwake = false
+    /** The model for this session, fixed at wake so a reconnect keeps the same brain. */
+    private var sessionModel = OpenAI.realtimeModel
     private var reconnecting = false
 
     private var transcript = ""
@@ -80,11 +82,12 @@ class LiveVoice {
             return
         }
         VoiceService.ensureRunning(app)
+        sessionModel = OpenAI.realtimeModel
         wantAwake = true
         setState(State.WAKING)
         Bluey.scope.launch {
             val token = try {
-                OpenAI.mintToken(Bluey.brain.sessionConfig())
+                OpenAI.mintToken(Bluey.brain.sessionConfig(sessionModel))
             } catch (e: Exception) {
                 showCaption(e.message ?: "I couldn't start a voice session.", true)
                 null
@@ -171,7 +174,7 @@ class LiveVoice {
 
     private fun connect(token: String) {
         val request = Request.Builder()
-            .url("wss://api.openai.com/v1/realtime?model=${OpenAI.REALTIME_MODEL}")
+            .url("wss://api.openai.com/v1/realtime?model=$sessionModel")
             .header("Authorization", "Bearer $token")
             .build()
         val ws = OpenAI.socketHttp.newWebSocket(request, object : WebSocketListener() {
@@ -239,7 +242,7 @@ class LiveVoice {
         if (!wantAwake) return
         reconnecting = true
         Bluey.scope.launch {
-            val token = runCatching { OpenAI.mintToken(Bluey.brain.sessionConfig()) }.getOrNull()
+            val token = runCatching { OpenAI.mintToken(Bluey.brain.sessionConfig(sessionModel)) }.getOrNull()
             if (!wantAwake || socket != null) return@launch
             if (token != null) {
                 connect(token)

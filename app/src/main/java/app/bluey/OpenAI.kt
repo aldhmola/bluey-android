@@ -29,7 +29,11 @@ class OpenAIError(message: String) : Exception(message)
 
 /** The plain HTTP calls: voice-session keys, transcription and web research. */
 object OpenAI {
-    const val REALTIME_MODEL = "gpt-realtime-2.1"
+    private const val REALTIME_FULL = "gpt-realtime-2.1"
+    private const val REALTIME_MINI = "gpt-realtime-2.1-mini"
+
+    /** His voice brain: the full model, or mini when "Cheaper brain" is on (about a third of the price). */
+    val realtimeModel: String get() = if (Bluey.settings.cheapBrain) REALTIME_MINI else REALTIME_FULL
     const val RESEARCH_MODEL = "gpt-5.5"
     private const val DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
     private val FALLBACK_MODELS = listOf("gpt-transcribe", "gpt-4o-transcribe")

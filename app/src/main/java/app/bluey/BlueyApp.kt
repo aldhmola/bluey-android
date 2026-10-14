@@ -83,6 +83,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("meetingNotes", true)
         set(value) = save { putBoolean("meetingNotes", value) }
 
+    /** Uses gpt-realtime-2.1-mini: about a third of the price, a bit weaker at multi-step phone tasks. */
+    var cheapBrain: Boolean
+        get() = prefs.getBoolean("cheapBrain", false)
+        set(value) = save { putBoolean("cheapBrain", value) }
+
     /** Chirp loudness, 0…1. */
     var volume: Float
         get() = prefs.getFloat("volume", 0.8f)

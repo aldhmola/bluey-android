@@ -86,9 +86,9 @@ class Brain {
         return s.personality + "\n\n" + TOOL_GUIDE + if (s.phoneControl) "\n\n" + PHONE_GUIDE else ""
     }
 
-    fun sessionConfig(): JSONObject = JSONObject()
+    fun sessionConfig(model: String): JSONObject = JSONObject()
         .put("type", "realtime")
-        .put("model", OpenAI.REALTIME_MODEL)
+        .put("model", model)
         .put("instructions", instructions())
         // He never talks out loud: replies are text, shown as speech bubbles.
         .put("output_modalities", JSONArray().put("text"))
