@@ -25,6 +25,7 @@ class VoiceService : Service() {
         private const val NOTIFICATION_ID = 7
         private const val ACTION_TOGGLE = "app.bluey.TOGGLE"
         private const val ACTION_QUIT = "app.bluey.QUIT"
+        private const val ACTION_MEETING = "app.bluey.MEETING"
 
         @Volatile
         var running = false
@@ -68,6 +69,7 @@ class VoiceService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_TOGGLE -> Bluey.voice.toggle()
+            ACTION_MEETING -> Bluey.voice.setMeetingMode(!Bluey.voice.meetingMode)
             ACTION_QUIT -> {
                 Bluey.voice.sleep()
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -97,13 +99,13 @@ class VoiceService : Service() {
 
     private fun refresh() {
         if (!running) return
-        val text = statusLine()
+        val text = statusLine() + Bluey.voice.meetingMode
         if (text == lastText) return
         lastText = text
         getSystemService(NotificationManager::class.java)!!.notify(NOTIFICATION_ID, notification())
     }
 
-    private fun statusLine(): String = when (Bluey.voice.state) {
+    private fun statusLine(): String = (if (Bluey.voice.meetingMode && Bluey.voice.isAwake) "Meeting mode · " else "") + when (Bluey.voice.state) {
         LiveVoice.State.ASLEEP -> "Asleep. Double-tap him to wake him."
         LiveVoice.State.WAKING -> "Waking up…"
         LiveVoice.State.LISTENING -> "Listening. Hold him to ask."
@@ -123,6 +125,9 @@ class VoiceService : Service() {
             this, 2, Intent(this, VoiceService::class.java).setAction(ACTION_QUIT), PendingIntent.FLAG_IMMUTABLE
         )
         val awake = Bluey.voice.isAwake
+        val meeting = PendingIntent.getService(
+            this, 3, Intent(this, VoiceService::class.java).setAction(ACTION_MEETING), PendingIntent.FLAG_IMMUTABLE
+        )
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_bluey_small)
             .setContentTitle("Bluey")
@@ -131,6 +136,11 @@ class VoiceService : Service() {
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
             .addAction(Notification.Action.Builder(null, if (awake) "Sleep" else "Wake", toggle).build())
+            .apply {
+                if (awake) addAction(
+                    Notification.Action.Builder(null, if (Bluey.voice.meetingMode) "End meeting mode" else "Meeting mode", meeting).build()
+                )
+            }
             .addAction(Notification.Action.Builder(null, "Turn off", quit).build())
             .build()
     }

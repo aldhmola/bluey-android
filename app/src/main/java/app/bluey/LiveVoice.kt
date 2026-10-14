@@ -49,6 +49,37 @@ class LiveVoice {
     private var awaitingQuestion = false
     private var toolsRunning = 0
 
+    /** Meeting mode: stays awake (and recording) until you send him to sleep; auto-sleep is skipped. */
+    var meetingMode = false
+        private set
+    /** Last time you asked something or he answered, for auto-sleep. */
+    private var lastActivity = 0L
+
+    fun setMeetingMode(on: Boolean) {
+        meetingMode = on
+        touch()
+        Bluey.changed()
+    }
+
+    private fun touch() {
+        lastActivity = android.os.SystemClock.uptimeMillis()
+    }
+
+    private val idleCheck = object : Runnable {
+        override fun run() {
+            if (state == State.ASLEEP) return
+            val minutes = Bluey.settings.autoSleepMinutes
+            val busy = holding || responseActive || toolsRunning > 0 || state == State.WAKING
+            val idleMs = android.os.SystemClock.uptimeMillis() - lastActivity
+            if (!meetingMode && minutes > 0 && !busy && idleMs > minutes * 60_000L) {
+                sleep()
+                showCaption("Nodding off. Double-tap me if you need me.", true)
+                return
+            }
+            Bluey.main.postDelayed(this, 20_000)
+        }
+    }
+
     val isAwake: Boolean get() = state != State.ASLEEP
 
     private fun setState(new: State) {
@@ -72,6 +103,9 @@ class LiveVoice {
 
     fun wake() {
         if (state != State.ASLEEP) return
+        touch()
+        Bluey.main.removeCallbacks(idleCheck)
+        Bluey.main.postDelayed(idleCheck, 20_000)
         val app = Bluey.app
         if (app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             showCaption("I need the microphone. Open the Bluey app and allow it.", true)
@@ -107,6 +141,8 @@ class LiveVoice {
         wantAwake = false
         reconnecting = false
         recorder.finish()
+        Bluey.main.removeCallbacks(idleCheck)
+        meetingMode = false
         if (wasRunning) Bluey.notes.endSession()
         askedItems.clear()
         awaitingQuestion = false
@@ -127,6 +163,7 @@ class LiveVoice {
     /** You pressed and held him: what you say now is the question. */
     fun beginAsk() {
         holding = true
+        touch()
         showCaption("", false)
         if (state == State.ASLEEP) {
             wake()
@@ -150,6 +187,7 @@ class LiveVoice {
     /** Asks him something typed, with no voice needed (from the app screen). */
     fun askTyped(text: String) {
         if (socket == null) return
+        touch()
         Bluey.notes.asked(text)
         setState(State.THINKING)
         send(
@@ -298,6 +336,7 @@ class LiveVoice {
             }
 
             "conversation.item.input_audio_transcription.completed" -> {
+                Bluey.usage.addLiveTranscription(event.optJSONObject("usage"))
                 val item = event.optString("item_id", "")
                 val text = event.optString("transcript", "").trim()
                 if (text.isNotEmpty()) {
@@ -306,6 +345,8 @@ class LiveVoice {
             }
 
             "response.done" -> {
+                touch()
+                Bluey.usage.addRealtime(sessionModel, event.optJSONObject("response")?.optJSONObject("usage"))
                 responseActive = false
                 if (transcript.isNotEmpty()) {
                     showCaption(transcript, true)

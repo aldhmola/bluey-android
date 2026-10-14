@@ -193,7 +193,10 @@ class ChunkRecorder {
                 null
             }
             session.transcribing = maxOf(0, session.transcribing - 1)
-            if (segments != null) Bluey.notes.transcribed(session, started, ended, segments)
+            if (segments != null) {
+                Bluey.usage.addTranscription((ended - started) / 1000.0)
+                Bluey.notes.transcribed(session, started, ended, segments)
+            }
             else Bluey.notes.save(session)
         }
     }

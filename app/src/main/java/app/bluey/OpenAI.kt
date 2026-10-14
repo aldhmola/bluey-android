@@ -172,6 +172,7 @@ object OpenAI {
         val (code, text) = postJson("responses", body)
         if (code != 200) throw OpenAIError("The research didn't come back: $code ${text.take(160)}")
         val json = JSONObject(text)
+        Bluey.usage.addResearch(json.optJSONObject("usage"))
 
         val answer = StringBuilder()
         val sources = mutableListOf<Pair<String, String>>()

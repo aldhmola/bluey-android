@@ -46,6 +46,10 @@ class MainActivity : Activity() {
     private lateinit var setup: LinearLayout
     private lateinit var settingsBox: LinearLayout
     private lateinit var notesBox: LinearLayout
+    private lateinit var cost: TextView
+    private lateinit var meetingButton: Button
+    private lateinit var autoSleepButton: Button
+    private lateinit var languageButton: Button
 
     private val refresh: () -> Unit = { render() }
 
@@ -90,7 +94,26 @@ class MainActivity : Activity() {
             textSize = 14f
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        column.addView(status, matchWrap(bottom = 10))
+        column.addView(status, matchWrap(bottom = 4))
+
+        cost = TextView(this).apply {
+            setTextColor(0xFF8E88A3.toInt())
+            textSize = 13f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setOnLongClickListener {
+                dialog().setTitle("Reset the cost meter?")
+                    .setMessage("This only clears the estimate on this phone. Your real bill is on platform.openai.com.")
+                    .setPositiveButton("Reset") { _, _ -> Bluey.usage.reset() }
+                    .setNegativeButton("Cancel", null).show()
+                true
+            }
+        }
+        column.addView(cost, matchWrap(bottom = 10))
+
+        meetingButton = button("Meeting mode: off") {
+            Bluey.voice.setMeetingMode(!Bluey.voice.meetingMode)
+        }
+        column.addView(meetingButton, matchWrap(bottom = 8))
 
         askField = EditText(this).apply {
             hint = "Type a question instead…"
@@ -171,6 +194,13 @@ class MainActivity : Activity() {
         reply.visibility = if (caption.isEmpty()) View.GONE else View.VISIBLE
         reply.text = caption
         askRow.visibility = if (voice.isAwake) View.VISIBLE else View.GONE
+        meetingButton.visibility = if (voice.isAwake) View.VISIBLE else View.GONE
+        meetingButton.text = if (voice.meetingMode) "Meeting mode: on (stays awake until you stop it)" else "Meeting mode: off"
+        cost.text = String.format(
+            java.util.Locale.US, "Estimated cost · today $%.2f · this month $%.2f", Bluey.usage.today(), Bluey.usage.thisMonth()
+        )
+        autoSleepButton.text = "Auto-sleep: " + autoSleepLabel(Bluey.settings.autoSleepMinutes)
+        languageButton.text = "Reply language: " + languageLabel(Bluey.settings.language)
         // The setup steps and notes list change rarely; rebuild them a moment after things settle.
         status.removeCallbacks(renderSlow)
         status.postDelayed(renderSlow, 500)
@@ -265,6 +295,11 @@ class MainActivity : Activity() {
         settingsBox.addView(toggle("Record meeting notes", "Saves the session's audio in five-minute chunks and transcribes it with speaker labels.", s.meetingNotes) {
             s.meetingNotes = it
         })
+        autoSleepButton = button("Auto-sleep") { pickAutoSleep() }
+        settingsBox.addView(autoSleepButton, matchWrap(bottom = 4))
+        settingsBox.addView(note("Sends him to sleep after this long without a question, so a forgotten Bluey doesn't keep billing. Meeting mode skips it."))
+        languageButton = button("Reply language") { pickLanguage() }
+        settingsBox.addView(languageButton, matchWrap(bottom = 8))
         settingsBox.addView(slider("Chirp volume", (s.volume * 100).toInt()) {
             s.volume = it / 100f
         })
@@ -274,7 +309,7 @@ class MainActivity : Activity() {
             BlueyAccessibility.instance?.overlay?.screenChanged()
         })
         settingsBox.addView(button("Personality…") { editPersonality() }, matchWrap(bottom = 4))
-        settingsBox.addView(note("Changes to the brain, personality and phone control apply the next time you wake him."))
+        settingsBox.addView(note("Changes to the brain, language, personality and phone control apply the next time you wake him."))
     }
 
     private fun renderNotes() {
@@ -302,6 +337,7 @@ class MainActivity : Activity() {
                 textSize = 13f
             })
             val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            buttons.addView(button("Read") { openNotes(session.folder) })
             buttons.addView(button("Copy") { copyNotes(session.notes) })
             buttons.addView(button("Share") { shareNotes(session.notes) })
             row.addView(buttons)
@@ -329,6 +365,89 @@ class MainActivity : Activity() {
     // MARK: Dialogs
 
     private fun dialog() = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+
+    private val autoSleepChoices = listOf(5, 10, 20, 30, 0)
+    private fun autoSleepLabel(minutes: Int) = if (minutes <= 0) "never" else "after $minutes min"
+
+    private fun pickAutoSleep() {
+        val labels = autoSleepChoices.map { autoSleepLabel(it).replaceFirstChar { c -> c.uppercase() } }.toTypedArray()
+        dialog().setTitle("Auto-sleep")
+            .setSingleChoiceItems(labels, autoSleepChoices.indexOf(Bluey.settings.autoSleepMinutes)) { d, i ->
+                Bluey.settings.autoSleepMinutes = autoSleepChoices[i]
+                d.dismiss()
+            }.show()
+    }
+
+    private val languageChoices = listOf("auto", "en", "es")
+    private fun languageLabel(code: String) = when (code) {
+        "en" -> "English"
+        "es" -> "Español"
+        else -> "Match mine (English or Spanish)"
+    }
+
+    private fun pickLanguage() {
+        val labels = languageChoices.map { languageLabel(it) }.toTypedArray()
+        dialog().setTitle("Reply language")
+            .setSingleChoiceItems(labels, languageChoices.indexOf(Bluey.settings.language).coerceAtLeast(0)) { d, i ->
+                Bluey.settings.language = languageChoices[i]
+                d.dismiss()
+            }.show()
+    }
+
+    /** Reads a session's notes in the app, with a button to name the speakers. */
+    private fun openNotes(folder: File) {
+        val session = Bluey.notes.load(folder) ?: return
+        val body = TextView(this).apply {
+            text = Bluey.notes.text(session)
+            setTextColor(0xFFE6E2F2.toInt())
+            textSize = 14f
+            setLineSpacing(0f, 1.15f)
+            setTextIsSelectable(true)
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+        }
+        val scroll = ScrollView(this).apply { addView(body) }
+        val builder = dialog().setTitle("Notes").setView(scroll)
+            .setPositiveButton("Close", null)
+            .setNegativeButton("Share") { _, _ -> shareText(Bluey.notes.text(session)) }
+        if (Bluey.notes.speakerLetters(session).isNotEmpty()) {
+            builder.setNeutralButton("Name speakers") { _, _ -> nameSpeakers(session) }
+        }
+        builder.show()
+    }
+
+    private fun nameSpeakers(session: SessionStore.Session) {
+        val letters = Bluey.notes.speakerLetters(session)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+        }
+        val fields = letters.associateWith { letter ->
+            EditText(this).apply {
+                hint = "Speaker $letter"
+                setText(session.speakers[letter] ?: "")
+                setSingleLine()
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            }.also { box.addView(it) }
+        }
+        dialog().setTitle("Who's who?")
+            .setMessage("Letters are assigned per five-minute stretch, so check a line or two before naming.")
+            .setView(box)
+            .setPositiveButton("Save") { _, _ ->
+                Bluey.notes.nameSpeakers(session, fields.mapValues { it.value.text.toString() })
+                Bluey.main.postDelayed({ openNotes(session.folder) }, 1500)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun shareText(text: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Bluey meeting notes")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(send, "Share notes"))
+    }
 
     private fun askForKey() {
         val field = EditText(this).apply {

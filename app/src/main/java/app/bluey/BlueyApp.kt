@@ -36,6 +36,8 @@ object Bluey {
         private set
     lateinit var brain: Brain
         private set
+    lateinit var usage: Usage
+        private set
 
     val main = Handler(Looper.getMainLooper())
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -46,6 +48,7 @@ object Bluey {
         if (::settings.isInitialized) return
         app = context.applicationContext
         settings = Settings(app)
+        usage = Usage(app)
         notes = SessionStore(app)
         brain = Brain()
         voice = LiveVoice()
@@ -87,6 +90,16 @@ class Settings(context: Context) {
     var cheapBrain: Boolean
         get() = prefs.getBoolean("cheapBrain", false)
         set(value) = save { putBoolean("cheapBrain", value) }
+
+    /** Minutes without a question before he goes back to sleep (0 = never). Meeting mode skips it. */
+    var autoSleepMinutes: Int
+        get() = prefs.getInt("autoSleepMinutes", 10)
+        set(value) = save { putInt("autoSleepMinutes", value) }
+
+    /** "auto" (answer in the language you used), "en" or "es". */
+    var language: String
+        get() = prefs.getString("language", "auto") ?: "auto"
+        set(value) = save { putString("language", value) }
 
     /** Chirp loudness, 0…1. */
     var volume: Float

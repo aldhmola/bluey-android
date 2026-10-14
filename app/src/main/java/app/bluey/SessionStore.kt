@@ -21,6 +21,8 @@ class SessionStore(context: Context) {
         var ended: Long? = null
         val entries = mutableListOf<Entry>()
         var transcribing = 0
+        /** Names for speaker letters ("A" -> "Alberto"), set in the notes viewer. */
+        val speakers = mutableMapOf<String, String>()
     }
 
     /** A saved session, for the list in the app. */
@@ -146,7 +148,45 @@ class SessionStore(context: Context) {
             .put("ended", session.ended ?: 0L)
             .put("transcribing", session.transcribing)
             .put("entries", entries)
+            .put("speakers", JSONObject(session.speakers as Map<*, *>))
     }
+
+    /** A saved session, read back from its files (or the live one, if it's still going). */
+    fun load(folder: File): Session? {
+        current?.let { if (it.folder == folder) return it }
+        val json = runCatching { JSONObject(File(folder, "session.json").readText()) }.getOrNull() ?: return null
+        val session = Session(json.optString("id"), json.optLong("started"), folder)
+        session.ended = json.optLong("ended", 0L).takeIf { it > 0 }
+        session.transcribing = 0
+        val entries = json.optJSONArray("entries") ?: JSONArray()
+        for (i in 0 until entries.length()) {
+            val e = entries.getJSONObject(i)
+            session.entries.add(
+                Entry(
+                    e.optString("kind"), (e.optDouble("time") * 1000).toLong(), e.optString("text"),
+                    if (e.has("speaker")) e.optString("speaker") else null
+                )
+            )
+        }
+        json.optJSONObject("speakers")?.let { names ->
+            names.keys().forEach { key -> names.optString(key).takeIf { it.isNotBlank() }?.let { session.speakers[key] = it } }
+        }
+        return session
+    }
+
+    /** The speaker letters that appear in a session's transcript, in order. */
+    fun speakerLetters(session: Session): List<String> =
+        session.entries.mapNotNull { it.speaker }.filter { it != "?" }.distinct().sorted()
+
+    /** Names the speakers and rewrites the session's files. */
+    fun nameSpeakers(session: Session, names: Map<String, String>) {
+        session.speakers.clear()
+        names.forEach { (letter, name) -> if (name.isNotBlank()) session.speakers[letter] = name.trim() }
+        save(session)
+    }
+
+    /** The notes as plain text, for reading in the app. */
+    fun text(session: Session): String = markdown(session)
 
     private fun markdown(session: Session): String {
         val day = SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.getDefault())
@@ -168,7 +208,11 @@ class SessionStore(context: Context) {
         for (entry in session.entries) {
             val time = clock.format(Date(entry.time))
             when (entry.kind) {
-                "transcript" -> out.add("**[$time] Speaker ${entry.speaker ?: "?"}:** ${entry.text}")
+                "transcript" -> {
+                    val letter = entry.speaker ?: "?"
+                    val who = session.speakers[letter] ?: "Speaker $letter"
+                    out.add("**[$time] $who:** ${entry.text}")
+                }
                 "heard" -> out.add("[$time] (live) ${entry.text}")
                 "asked" -> out.add("> **[$time] I asked Bluey:** ${entry.text}")
                 "reply" -> out.add("> **Bluey:** ${entry.text}")

@@ -83,7 +83,13 @@ class Brain {
 
     fun instructions(): String {
         val s = Bluey.settings
-        return s.personality + "\n\n" + TOOL_GUIDE + if (s.phoneControl) "\n\n" + PHONE_GUIDE else ""
+        val language = when (s.language) {
+            "es" -> "Language: always reply in Spanish (Mexican Spanish, casual), whatever language the user speaks."
+            "en" -> "Language: always reply in English, whatever language the user speaks."
+            else -> "Language: the user is bilingual. Reply in the language of their question (English or Spanish; " +
+                "Mexican Spanish, casual). If they mix both, use the one they used most."
+        }
+        return s.personality + "\n\n" + language + "\n\n" + TOOL_GUIDE + if (s.phoneControl) "\n\n" + PHONE_GUIDE else ""
     }
 
     fun sessionConfig(model: String): JSONObject = JSONObject()

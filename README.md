@@ -14,6 +14,11 @@ Bluey is a blueberry with googly eyes who floats over your apps with his own lit
 - **Meeting notes**: while he's awake the session is recorded in five-minute chunks and transcribed with
   speaker labels. Copy or share the notes from the app.
 - **Tap him once** while he's busy to stop him.
+- **Auto-sleep** after 10 idle minutes (adjustable), so a forgotten Bluey doesn't keep billing. **Meeting mode**
+  keeps him awake and recording until you stop it.
+- **Cost meter**: an estimate of today's and this month's spend, right in the app.
+- **English or Spanish**: he answers in the language you ask in (or always one of them).
+- **Notes viewer**: read sessions in the app and name the speakers.
 
 ## Install (from the phone)
 
